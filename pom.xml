@@ -7,6 +7,39 @@
     <groupId>org.example</groupId>
     <artifactId>GMApi</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>java</goal>            <!-- java还是exec-->
+                        </goals>
+                        <phase>compile</phase>              <!--生命周期-->
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>com.sf.ucmp2.doclet.Main</mainClass>        <!--程序入口，主类名称-->
+                    <arguments>
+                        <argument>-encoding</argument>                          <!--相关参数-->
+                        <argument>utf-8</argument>
+                    </arguments>
+                    <classpathScope>compile</classpathScope>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
     <dependencies>
         <dependency>
@@ -19,6 +52,7 @@
             <artifactId>bcprov-jdk15on</artifactId>
             <version>1.60</version>
         </dependency>
+
 
         <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcpkix-jdk15on -->
         <dependency>

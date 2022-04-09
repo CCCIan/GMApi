@@ -1,10 +1,15 @@
 package CIan.GM;
 
 import CIan.GM.easysign.cms.gm.CMSUtil;
+import CIan.GM.easysign.sign.SM2SignUtil;
 import cn.hutool.crypto.asymmetric.KeyType;
 import cn.hutool.crypto.asymmetric.SM2;
+import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.*;
 import org.bouncycastle.util.encoders.Base64;
+import org.bouncycastle.cms.*;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 
 
 import java.io.ByteArrayInputStream;
@@ -17,25 +22,10 @@ import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Collection;
+import java.util.Iterator;
 
 public class SM2Api {
-
-    public String SM2DecryptHex(String privateKeyHex, String txtStr){
-        final SM2 sm2 = new SM2(privateKeyHex, null);
-        sm2.usePlainEncoding();
-        String devStr = sm2.decryptStrFromBcd(txtStr, KeyType.PrivateKey);
-        return devStr;
-    }
-
-    public String SM2DecryptPem(String privateKeyPem, String txtStr) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException{
-        KeyFactory keyfactory = KeyFactory.getInstance("EC", BouncyCastleProvider.PROVIDER_NAME);
-        PKCS8EncodedKeySpec eks = new PKCS8EncodedKeySpec(Base64.decode(privateKeyPem));
-        ECPrivateKey ecpPri = (ECPrivateKey) keyfactory.generatePrivate(eks);
-        final SM2 sm2 = new SM2(ecpPri, null);
-        sm2.usePlainEncoding();
-        String devStr = sm2.decryptStrFromBcd(txtStr, KeyType.PrivateKey);
-        return devStr;
-    }
 
     public String SM2EncryptHex(String publicKeyHex, String txtStr){
         final SM2 sm2 = new SM2(null, publicKeyHex);
@@ -44,7 +34,14 @@ public class SM2Api {
         return envStr;
     }
 
-    public String SM2EncryptPem(String publicKeyCert, String txtStr) throws CertificateException, NoSuchProviderException{
+    public String SM2DecryptHex(String privateKeyHex, String txtStr){
+        final SM2 sm2 = new SM2(privateKeyHex, null);
+        sm2.usePlainEncoding();
+        String devStr = sm2.decryptStrFromBcd(txtStr, KeyType.PrivateKey);
+        return devStr;
+    }
+
+    public String SM2EncryptCert(String publicKeyCert, String txtStr) throws CertificateException, NoSuchProviderException{
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
             Security.addProvider(new BouncyCastleProvider());
         }
@@ -56,12 +53,61 @@ public class SM2Api {
         return envStr;
     }
 
+    public String SM2DecryptPem(String privateKeyPem, String txtStr) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException{
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
+        KeyFactory keyfactory = KeyFactory.getInstance("EC", BouncyCastleProvider.PROVIDER_NAME);
+        PKCS8EncodedKeySpec eks = new PKCS8EncodedKeySpec(Base64.decode(privateKeyPem));
+        ECPrivateKey ecpPri = (ECPrivateKey) keyfactory.generatePrivate(eks);
+        final SM2 sm2 = new SM2(ecpPri, null);
+        sm2.usePlainEncoding();
+        String devStr = sm2.decryptStrFromBcd(txtStr, KeyType.PrivateKey);
+        return devStr;
+    }
+
+    public static String SM2SignKeyPKCS1(String privateKeyHex, String txtStr) {
+        final SM2 sm2 = new SM2(privateKeyHex, null);
+        sm2.usePlainEncoding();
+        byte[] sign = sm2.sign(txtStr.getBytes());
+        return new String(cn.hutool.core.codec.Base64.encode(sign));
+    }
+
+    public static boolean SM2VerifyKeyPKCS1(String publicKeyHex, String txtStr, String sign) {
+        final SM2 sm2 = new SM2(null, publicKeyHex);
+        sm2.usePlainEncoding();
+        boolean verifySign = sm2.verify(txtStr.getBytes(), cn.hutool.core.codec.Base64.decode(sign.getBytes()));
+        return verifySign;
+    }
+
+    public static String SM2SignPemPKCS1(String privateKeyPem, String txtStr) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
+        KeyFactory keyfactory = KeyFactory.getInstance("EC", BouncyCastleProvider.PROVIDER_NAME);
+        PKCS8EncodedKeySpec eks = new PKCS8EncodedKeySpec(cn.hutool.core.codec.Base64.decode(privateKeyPem));
+        ECPrivateKey ecpPri = (ECPrivateKey) keyfactory.generatePrivate(eks);
+        final SM2 sm2 = new SM2(ecpPri, null);
+        sm2.usePlainEncoding();
+        byte[] sign = sm2.sign(txtStr.getBytes());
+        return new String(cn.hutool.core.codec.Base64.encode(sign));
+    }
+
+    public static boolean SM2VerifyCertPKCS1(String publicKeyCert, String txtStr, String sign) throws CertificateException, NoSuchProviderException {
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
+        CertificateFactory factory = CertificateFactory.getInstance("X.509", "BC");
+        Certificate cert = factory.generateCertificate(new ByteArrayInputStream(publicKeyCert.getBytes()));
+        final SM2 sm2 = new SM2(null, cert.getPublicKey());
+        sm2.usePlainEncoding();
+        boolean verifySign = sm2.verify(txtStr.getBytes(), cn.hutool.core.codec.Base64.decode(sign.getBytes()));
+        return verifySign;
+    }
+
     public static String SM2SignPemPKCS7(String publicKeyCert, String privateKeyPem, String txtStr) throws Exception{
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
             Security.addProvider(new BouncyCastleProvider());
         }
         CertificateFactory factory = CertificateFactory.getInstance("X.509", "BC");
-        InputStream inputStream   =   new   ByteArrayInputStream(publicKeyCert.getBytes());
+        InputStream inputStream = new ByteArrayInputStream(publicKeyCert.getBytes());
         X509Certificate Cert = (X509Certificate)factory.generateCertificate(inputStream);
 
         KeyFactory keyfactory = KeyFactory.getInstance("EC", BouncyCastleProvider.PROVIDER_NAME);
@@ -71,20 +117,40 @@ public class SM2Api {
         return signedValue;
     }
 
-    public static void main(String[] args) throws Exception{
-        String str = "everything";
-        String certInfo = "-----BEGIN CERTIFICATE-----\r\n"
-                + "MIIBrTCCAVICCQCxYpYSzXCIRzAKBggqgRzPVQGDdTBeMQswCQYDVQQGEwJDTjEL\r\n"
-                + "MAkGA1UECAwCSEYxCzAJBgNVBAcMAkhGMQ8wDQYDVQQKDAZIU0JBTksxDTALBgNV\r\n"
-                + "BAsMBFRFU1QxFTATBgNVBAMMDFRFU1QgTUVSQ0hOVDAeFw0yMTExMDgwNjU4Mzla\r\n"
-                + "Fw0zMTExMDYwNjU4MzlaMF4xCzAJBgNVBAYTAkNOMQswCQYDVQQIDAJIRjELMAkG\r\n"
-                + "A1UEBwwCSEYxDzANBgNVBAoMBkhTQkFOSzENMAsGA1UECwwEVEVTVDEVMBMGA1UE\r\n"
-                + "AwwMVEVTVCBNRVJDSE5UMFkwEwYHKoZIzj0CAQYIKoEcz1UBgi0DQgAEEK5LRFTv\r\n"
-                + "uODEaW1GWPLsT1PwyOs4KyKUA5OT92BD5mmqCNejc+x4WYaT2sTArkiH4At8C4xl\r\n"
-                + "Eq15hSuxBt95hDAKBggqgRzPVQGDdQNJADBGAiEA2tMG8OCrzQ7485duxy+ZtOBK\r\n"
-                + "qoBoIGNNUOT4DFo236YCIQDOkzg47NsjiLzXVpzfF4hS41QPFgY5yWD+OM2KNy+U\r\n" + "jw==\r\n"
-                + "-----END CERTIFICATE-----";
-        String privatePem = "MIGHAgEAMBMGByqGSM49AgEGCCqBHM9VAYItBG0wawIBAQQg1eGvibIkTl8gsrE76MhYb7rn6wv34uul59OSKh8Q1i2hRANCAAQQrktEVO+44MRpbUZY8uxPU/DI6zgrIpQDk5P3YEPmaaoI16Nz7HhZhpPaxMCuSIfgC3wLjGUSrXmFK7EG33mE";
-        System.out.println(SM2SignPemPKCS7(certInfo, privatePem, str));
+    public static boolean SM2VerifyCertPKCS7(String txtStr, String sign) throws Exception{
+        byte[] signdata = Base64.decode(sign);
+        ByteArrayInputStream inStream = new ByteArrayInputStream((signdata));
+        CMSSignedData cmsSingedData = new CMSSignedData(inStream);
+//        ASN1InputStream ais = new ASN1InputStream(Base64.decode(signedData));
+
+        //签名值
+        byte[] signed = null;
+        X509Certificate cert = null;
+        Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+        CollectionStore x509s = (CollectionStore)cmsSingedData.getCertificates();
+        X509CertificateHolder holder = (X509CertificateHolder)x509s.iterator().next();
+        InputStream in = new ByteArrayInputStream(holder.getEncoded());
+        cert = new JcaX509CertificateConverter().setProvider(new BouncyCastleProvider()).getCertificate(holder);
+        // 获得证书信息
+        byte[] bytes = new byte[0];
+        bytes = new byte[in.available()];
+        in.read(bytes);
+        String cer = Base64.toBase64String(bytes);
+        System.out.println(cer);
+        CMSTypedData cmsTypeData = cmsSingedData.getSignedContent();
+        // 获得签名者信息
+        Object og = cmsSingedData.getSignerInfos();
+        SignerInformationStore signers = cmsSingedData.getSignerInfos();
+        Collection c = signers.getSigners();
+        Iterator it = c.iterator();
+        while (it.hasNext())
+        {
+            SignerInformation signer = (SignerInformation)it.next();
+//            System.out.println("摘要算法 =" + signer.getDigestAlgOID());
+//            System.out.println("算法 =" + signer.getEncryptionAlgOID());
+            signed = signer.getSignature();
+        }
+//        System.out.println("签名值length=" + signed.length);
+        return SM2SignUtil.verifySign(signed, txtStr.getBytes(), cert.getPublicKey());
     }
 }
