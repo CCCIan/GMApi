@@ -5,12 +5,14 @@ import CIan.GM.easysign.sign.SM2SignUtil;
 import cn.hutool.crypto.asymmetric.KeyType;
 import cn.hutool.crypto.asymmetric.SM2;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.util.*;
-import org.bouncycastle.util.encoders.Base64;
-import org.bouncycastle.cms.*;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-
+import org.bouncycastle.cms.CMSSignedData;
+import org.bouncycastle.cms.CMSTypedData;
+import org.bouncycastle.cms.SignerInformation;
+import org.bouncycastle.cms.SignerInformationStore;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.CollectionStore;
+import org.bouncycastle.util.encoders.Base64;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -66,21 +68,24 @@ public class SM2Api {
         return devStr;
     }
 
-    public static String SM2SignKeyPKCS1(String privateKeyHex, String txtStr) {
+    public String SM2SignKeyPKCS1(String privateKeyHex, String txtStr) {
         final SM2 sm2 = new SM2(privateKeyHex, null);
         sm2.usePlainEncoding();
         byte[] sign = sm2.sign(txtStr.getBytes());
         return new String(cn.hutool.core.codec.Base64.encode(sign));
     }
 
-    public static boolean SM2VerifyKeyPKCS1(String publicKeyHex, String txtStr, String sign) {
+    public boolean SM2VerifyKeyPKCS1(String publicKeyHex, String txtStr, String sign) {
         final SM2 sm2 = new SM2(null, publicKeyHex);
         sm2.usePlainEncoding();
         boolean verifySign = sm2.verify(txtStr.getBytes(), cn.hutool.core.codec.Base64.decode(sign.getBytes()));
         return verifySign;
     }
 
-    public static String SM2SignPemPKCS1(String privateKeyPem, String txtStr) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
+    public String SM2SignPemPKCS1(String privateKeyPem, String txtStr) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
         KeyFactory keyfactory = KeyFactory.getInstance("EC", BouncyCastleProvider.PROVIDER_NAME);
         PKCS8EncodedKeySpec eks = new PKCS8EncodedKeySpec(cn.hutool.core.codec.Base64.decode(privateKeyPem));
         ECPrivateKey ecpPri = (ECPrivateKey) keyfactory.generatePrivate(eks);
@@ -90,7 +95,7 @@ public class SM2Api {
         return new String(cn.hutool.core.codec.Base64.encode(sign));
     }
 
-    public static boolean SM2VerifyCertPKCS1(String publicKeyCert, String txtStr, String sign) throws CertificateException, NoSuchProviderException {
+    public boolean SM2VerifyCertPKCS1(String publicKeyCert, String txtStr, String sign) throws CertificateException, NoSuchProviderException {
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
             Security.addProvider(new BouncyCastleProvider());
         }
@@ -102,7 +107,7 @@ public class SM2Api {
         return verifySign;
     }
 
-    public static String SM2SignPemPKCS7(String publicKeyCert, String privateKeyPem, String txtStr) throws Exception{
+    public String SM2SignPemPKCS7(String publicKeyCert, String privateKeyPem, String txtStr) throws Exception{
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
             Security.addProvider(new BouncyCastleProvider());
         }
@@ -117,7 +122,7 @@ public class SM2Api {
         return signedValue;
     }
 
-    public static boolean SM2VerifyCertPKCS7(String txtStr, String sign) throws Exception{
+    public boolean SM2VerifyCertPKCS7(String txtStr, String sign) throws Exception{
         byte[] signdata = Base64.decode(sign);
         ByteArrayInputStream inStream = new ByteArrayInputStream((signdata));
         CMSSignedData cmsSingedData = new CMSSignedData(inStream);
